@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthMate AI</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        /* ========== YOUR CSS DESIGN ========== */
+        :root {
+            --bg-primary: #0a1628;
+            --bg-secondary: #1e293b;
+            --accent-blue: #0ea5e9;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --text-primary: #ffffff;
+            --text-secondary: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .slider-card {
+            background-color: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #334155;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .value-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--accent-blue);
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .analyze-button {
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 18px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .analyze-button:active {
+            transform: scale(0.98);
+        }
+
+        #result-card {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 16px;
+            display: none;
+            text-align: center;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="header">
+            <h1>HealthMate AI</h1>
+            <p style="color: var(--text-secondary)">Personal Health Assessment</p>
+        </div>
+
+        <div class="slider-card">
+            <div class="slider-header">
+                <span>💓 Heart Rate</span>
+                <span id="hr-val" class="value-display">72</span>
+            </div>
+            <input type="range" id="hr-slider" min="40" max="180" value="72">
+        </div>
+
+        <div class="slider-card">
+            <div class="slider-header">
+                <span>🌡️ Temperature (°F)</span>
+                <span id="temp-val" class="value-display">98.6</span>
+            </div>
+            <input type="range" id="temp-slider" min="95" max="104" value="98.6" step="0.1">
+        </div>
+
+        <div class="slider-card">
+            <div class="slider-header">
+                <span>⬆️ Systolic BP</span>
+                <span id="sys-val" class="value-display">120</span>
+            </div>
+            <input type="range" id="sys-slider" min="70" max="200" value="120">
+        </div>
+
+        <div class="slider-card">
+            <div class="slider-header">
+                <span>⬇️ Diastolic BP</span>
+                <span id="dia-val" class="value-display">80</span>
+            </div>
+            <input type="range" id="dia-slider" min="40" max="130" value="80">
+        </div>
+
+        <button class="analyze-button" onclick="runAnalysis()">
+            <i class="fas fa-microchip"></i> RUN AI ANALYSIS
+        </button>
+
+        <div id="result-card">
+            <h2 id="result-title"></h2>
+            <p id="result-text"></p>
+        </div>
+    </div>
+
+    <script>
+        // ========== YOUR JAVASCRIPT LOGIC ==========
+        function updateDisplay(id, val) {
+            document.getElementById(id + '-val').innerText = val;
+        }
+
+        // Attach listeners to update values in real-time
+        document.getElementById('hr-slider').oninput = (e) => updateDisplay('hr', e.target.value);
+        document.getElementById('temp-slider').oninput = (e) => updateDisplay('temp', e.target.value);
+        document.getElementById('sys-slider').oninput = (e) => updateDisplay('sys', e.target.value);
+        document.getElementById('dia-slider').oninput = (e) => updateDisplay('dia', e.target.value);
+
+        function runAnalysis() {
+            const hr = document.getElementById('hr-slider').value;
+            const temp = document.getElementById('temp-slider').value;
+            const sys = document.getElementById('sys-slider').value;
+            const dia = document.getElementById('dia-slider').value;
+
+            const card = document.getElementById('result-card');
+            const title = document.getElementById('result-title');
+            const text = document.getElementById('result-text');
+
+            // Safety Rules (Emergency Checks)
+            let status = "NORMAL";
+            let message = "Your vitals appear stable and healthy.";
+            let color = "var(--accent-green)";
+
+            if (temp > 102 || hr > 120 || sys > 160) {
+                status = "🛑 EMERGENCY";
+                message = "Critical vitals detected. Please consult a doctor immediately.";
+                color = "var(--accent-red)";
+            } else if (sys > 140 || dia > 90) {
+                status = "⚠️ WARNING";
+                message = "Elevated blood pressure detected. Monitor closely.";
+                color = "var(--accent-yellow)";
+            }
+
+            // Show result
+            card.style.display = "block";
+            card.style.backgroundColor = color + "22"; // 22 adds transparency
+            card.style.border = "2px solid " + color;
+            title.innerText = status;
+            title.style.color = color;
+            text.innerText = message;
+        }
+    </script>
+</body>
+</html>
