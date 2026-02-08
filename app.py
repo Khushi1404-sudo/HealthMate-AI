@@ -6,44 +6,69 @@ from sklearn.model_selection import train_test_split
 import streamlit.components.v1 as components
 import json
 
-# --- 1. DATA PREPROCESSING ---
+# --- 1. DATA PREPROCESSING (With Auto-Cleaning) ---
 @st.cache_resource
 def train_model():
-    df = pd.read_csv('data_clean.csv')
-    df['High_BP'] = ((df['Systolic'] > 140) | (df['Diastolic'] > 90)).astype(int)
-    X = df.drop('Target', axis=1)
-    y = df['Target']
+    df = pd.read_csv('Patient_Dataset.csv')
+    
+    # Force column names to be clean: lowercase and no spaces
+    df.columns = df.columns.str.strip().str.lower()
+    
+    # Match the logic to your new clean names
+    # Assuming your CSV has columns that include 'systolic', 'diastolic', and 'target'
+    df['high_bp'] = ((df['systolic'] > 140) | (df['diastolic'] > 90)).astype(int)
+    
+    X = df.drop('target', axis=1)
+    y = df['target']
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
     weight_ratio = len(y_train[y_train == 0]) / len(y_train[y_train == 1])
     model = XGBClassifier(scale_pos_weight=weight_ratio, eval_metric='logloss')
     model.fit(X_train, y_train)
-    return model
+    return model, X.columns.tolist()
 
-final_model = train_model()
+# Load Model
+model, feature_names = train_model()
 
-# --- 2. THE BRIDGE ---
-st.set_page_config(layout="wide", page_title="HealthMate AI")
+# --- 2. THE UI ---
+st.set_page_config(layout="wide")
 
-# This is the magic part: it receives the slider values from your HTML
 with open("index.html", "r") as f:
-    html_content = f.read()
+    html_code = f.read()
 
-# We "call" the component and it returns data if the user clicked 'Analyze'
-user_data = components.html(html_content, height=800)
+# This receives the "Message" from the Javascript
+val = components.html(html_code, height=700)
 
-# If user_data is sent from JS, we run the AI!
-if user_data:
-    data = json.loads(user_data)
-    hr, temp, sys, dia = data['hr'], data['temp'], data['sys'], data['dia']
+if val:
+    # Decode the data sent from the HTML sliders
+    user_input = json.loads(val)
+    hr = float(user_input['hr'])
+    temp = float(user_input['temp'])
+    sys = float(user_input['sys'])
+    dia = float(user_input['dia'])
+    high_bp = 1 if (sys > 140 or dia > 90) else 0
+
+    # Prepare data for AI (Must match the order of your CSV columns)
+    # We create a dictionary to ensure the names match exactly what the model saw
+    input_df = pd.DataFrame([{
+        'systolic': sys,
+        'diastolic': dia,
+        'heartrate': hr, # Make sure these names match your CSV columns!
+        'temp': temp,
+        'high_bp': high_bp
+    }])
     
-    # Preprocess input
-    high_bp = 1 if (float(sys) > 140 or float(dia) > 90) else 0
-    features = np.array([[float(hr), float(temp), float(sys), float(dia), high_bp]])
+    # If your CSV has more columns, you may need to add them here.
+    # For now, let's predict:
+    prediction = model.predict(input_df)[0]
     
-    # Predict
-    prediction = final_model.predict(features)[0]
+    # Send result BACK to the HTML design
+    title = "⚠️ HIGH RISK" if prediction == 1 else "✅ STABLE"
+    msg = "The AI detected patterns associated with health risks." if prediction == 1 else "Your vitals are within the normal AI range."
+    color = "#ef4444" if prediction == 1 else "#10b981"
     
-    if prediction == 1:
-        st.warning("⚠️ AI Prediction: High Risk detected based on your vitals.")
-    else:
-        st.success("✅ AI Prediction: Your vitals appear stable.")
+    # Update the HTML component with the result
+    components.html(html_code.replace("", ""), height=700)
+    st.sidebar.metric("AI Status", title)
+    st.sidebar.write(msg)
