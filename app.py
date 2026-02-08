@@ -6,69 +6,58 @@ from sklearn.model_selection import train_test_split
 import streamlit.components.v1 as components
 import json
 
-# --- 1. DATA PREPROCESSING (With Auto-Cleaning) ---
+# --- 1. DATA PREPROCESSING (Matched to your CSV) ---
 @st.cache_resource
-def train_model():
+def train_ai():
     df = pd.read_csv('Patient_Dataset.csv')
     
-    # Force column names to be clean: lowercase and no spaces
-    df.columns = df.columns.str.strip().str.lower()
-    
-    # Match the logic to your new clean names
-    # Assuming your CSV has columns that include 'systolic', 'diastolic', and 'target'
+    # Split "116/84" into 116 and 84
+    bp = df['Blood Pressure (mmHg)'].str.split('/', expand=True)
+    df['systolic'] = pd.to_numeric(bp[0])
+    df['diastolic'] = pd.to_numeric(bp[1])
+    df['hr'] = df['Heart Rate (bpm)']
+    df['temp_c'] = df['Temperature (°C)']
     df['high_bp'] = ((df['systolic'] > 140) | (df['diastolic'] > 90)).astype(int)
     
-    X = df.drop('target', axis=1)
-    y = df['target']
+    X = df[['hr', 'temp_c', 'systolic', 'diastolic', 'high_bp']]
+    y = df['Target']
     
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
-    weight_ratio = len(y_train[y_train == 0]) / len(y_train[y_train == 1])
-    model = XGBClassifier(scale_pos_weight=weight_ratio, eval_metric='logloss')
-    model.fit(X_train, y_train)
-    return model, X.columns.tolist()
+    model = XGBClassifier().fit(X, y)
+    return model
 
-# Load Model
-model, feature_names = train_model()
+model = train_ai()
 
-# --- 2. THE UI ---
-st.set_page_config(layout="wide")
+# --- 2. THE UI LOGIC ---
+st.set_page_config(layout="centered")
+
+# Default values
+params = {"HR": "72", "TEMP": "98.6", "SYS": "120", "DIA": "80", 
+          "DISPLAY": "none", "TITLE": "", "MSG": "", "COLOR": "transparent"}
 
 with open("index.html", "r") as f:
-    html_code = f.read()
+    template = f.read()
 
-# This receives the "Message" from the Javascript
-val = components.html(html_code, height=700)
+# When the user clicks "Analyze"
+val = components.html(template.replace("{{DISPLAY}}", "none"), height=600)
 
 if val:
-    # Decode the data sent from the HTML sliders
-    user_input = json.loads(val)
-    hr = float(user_input['hr'])
-    temp = float(user_input['temp'])
-    sys = float(user_input['sys'])
-    dia = float(user_input['dia'])
+    data = json.loads(val)
+    hr, temp_f, sys, dia = float(data['hr']), float(data['temp']), float(data['sys']), float(data['dia'])
+    
+    # AI Prediction
+    temp_c = (temp_f - 32) * 5/9
     high_bp = 1 if (sys > 140 or dia > 90) else 0
-
-    # Prepare data for AI (Must match the order of your CSV columns)
-    # We create a dictionary to ensure the names match exactly what the model saw
-    input_df = pd.DataFrame([{
-        'systolic': sys,
-        'diastolic': dia,
-        'heartrate': hr, # Make sure these names match your CSV columns!
-        'temp': temp,
-        'high_bp': high_bp
-    }])
+    pred = model.predict(np.array([[hr, temp_c, sys, dia, high_bp]]))[0]
     
-    # If your CSV has more columns, you may need to add them here.
-    # For now, let's predict:
-    prediction = model.predict(input_df)[0]
+    # Update Design with Result
+    params.update({"HR": str(hr), "TEMP": str(temp_f), "SYS": str(sys), "DIA": str(dia), "DISPLAY": "block"})
+    if pred == 1:
+        params.update({"TITLE": "🛑 HIGH RISK", "MSG": "AI detects a high-risk health pattern.", "COLOR": "#ef4444"})
+    else:
+        params.update({"TITLE": "✅ STABLE", "MSG": "Vitals are within normal range.", "COLOR": "#10b981"})
     
-    # Send result BACK to the HTML design
-    title = "⚠️ HIGH RISK" if prediction == 1 else "✅ STABLE"
-    msg = "The AI detected patterns associated with health risks." if prediction == 1 else "Your vitals are within the normal AI range."
-    color = "#ef4444" if prediction == 1 else "#10b981"
-    
-    # Update the HTML component with the result
-    components.html(html_code.replace("", ""), height=700)
-    st.sidebar.metric("AI Status", title)
-    st.sidebar.write(msg)
+    # Re-render with result
+    final_html = template
+    for key, value in params.items():
+        final_html = final_html.replace(f"{{{{{key}}}}}", value)
+    components.html(final_html, height=750)
