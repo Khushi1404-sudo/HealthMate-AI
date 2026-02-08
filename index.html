@@ -2,68 +2,50 @@
 <html>
 <head>
     <style>
-        :root { --bg: #0a1628; --card: #1e293b; --blue: #0ea5e9; }
-        body { background: var(--bg); color: white; font-family: sans-serif; padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 450px; }
-        .card { background: var(--card); padding: 20px; border-radius: 15px; margin-bottom: 15px; border: 1px solid #334155; }
-        input { width: 100%; cursor: pointer; }
-        button { background: var(--blue); color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #result { display: none; margin-top: 20px; padding: 20px; border-radius: 15px; text-align: center; border: 2px solid var(--blue); }
+        body { background-color: #0a1628; color: white; font-family: sans-serif; padding: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 15px; margin-bottom: 10px; }
+        input { width: 100%; margin: 10px 0; }
+        button { background: #0ea5e9; color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        #result { margin-top: 20px; padding: 20px; border-radius: 15px; text-align: center; display: {{DISPLAY}}; background-color: {{COLOR}}; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>HealthMate AI</h1>
-        <div class="card">
-            <label>Heart Rate: <span id="hr_v">72</span></label>
-            <input type="range" id="hr" min="40" max="180" value="72" oninput="document.getElementById('hr_v').innerText=this.value">
-            
-            <label>Temp (°F): <span id="temp_v">98.6</span></label>
-            <input type="range" id="temp" min="94" max="105" value="98.6" step="0.1" oninput="document.getElementById('temp_v').innerText=this.value">
-            
-            <label>Systolic: <span id="sys_v">120</span></label>
-            <input type="range" id="sys" min="70" max="200" value="120" oninput="document.getElementById('sys_v').innerText=this.value">
-            
-            <label>Diastolic: <span id="dia_v">80</span></label>
-            <input type="range" id="dia" min="40" max="130" value="80" oninput="document.getElementById('dia_v').innerText=this.value">
-            
-            <button onclick="sendToPython()">ANALYZE NOW</button>
-        </div>
-        <div id="result">
-            <h2 id="res_title"></h2>
-            <p id="res_msg"></p>
-        </div>
+    <h1>HealthMate AI</h1>
+    <div class="card">
+        <label>Heart Rate: <span id="hr_val">{{HR}}</span></label>
+        <input type="range" id="hr" min="40" max="180" value="{{HR}}" oninput="document.getElementById('hr_val').innerText=this.value">
+        
+        <label>Temp (°F): <span id="temp_val">{{TEMP}}</span></label>
+        <input type="range" id="temp" min="94" max="105" value="{{TEMP}}" step="0.1" oninput="document.getElementById('temp_val').innerText=this.value">
+        
+        <label>Systolic BP: <span id="sys_val">{{SYS}}</span></label>
+        <input type="range" id="sys" min="70" max="200" value="{{SYS}}" oninput="document.getElementById('sys_val').innerText=this.value">
+        
+        <label>Diastolic BP: <span id="dia_val">{{DIA}}</span></label>
+        <input type="range" id="dia" min="40" max="130" value="{{DIA}}" oninput="document.getElementById('dia_val').innerText=this.value">
+        
+        <button onclick="runAI()">ANALYZE NOW</button>
+    </div>
+    
+    <div id="result">
+        <h2>{{TITLE}}</h2>
+        <p>{{MSG}}</p>
     </div>
 
     <script>
-        function sendToPython() {
+        function runAI() {
             const data = {
                 hr: document.getElementById('hr').value,
                 temp: document.getElementById('temp').value,
                 sys: document.getElementById('sys').value,
                 dia: document.getElementById('dia').value
             };
-            // THE BRIDGE: This sends the numbers to Streamlit's Python side
             window.parent.postMessage({
                 isStreamlitCommunication: true,
                 type: "streamlit:setComponentValue",
                 value: JSON.stringify(data)
             }, "*");
         }
-
-        // Listen for the AI's answer coming back from Python
-        window.addEventListener("message", (event) => {
-            if (event.data.type === "streamlit:render") {
-                const args = event.data.args;
-                if (args.prediction_msg) {
-                    const resDiv = document.getElementById('result');
-                    resDiv.style.display = 'block';
-                    document.getElementById('res_title').innerText = args.prediction_title;
-                    document.getElementById('res_msg').innerText = args.prediction_msg;
-                    resDiv.style.borderColor = args.color;
-                }
-            }
-        });
     </script>
 </body>
 </html>
